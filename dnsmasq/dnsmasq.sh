@@ -1,7 +1,7 @@
 #! /bin/bash
 
 ###
-# TODO: The introduction of this shell.
+# Install the dnsmasq and the manager api
 # Author: rmfish@163.com
 # Date: 20150811
 # Version: 1
@@ -9,50 +9,61 @@
 
 USER=`whoami`
 BASH_NAME=$(basename $BASH_SOURCE)
-APP_TARGET=/home/admin/work/www/dnsmasq-api
-DNSMASQ_API_REPO=git://github.com/bpaquet/dnsmasq-rest-api.git
-NGINX_APP_CONF=/usr/local/nginx/conf/apps
+BASH_DIR=`bashdir`
 
-_current_path() {
-    SOURCE=${BASH_SOURCE[0]}
-    DIR=$( dirname "$SOURCE" )
-    while [ -h "$SOURCE" ]
-    do
-        SOURCE=$(readlink "$SOURCE")
-        [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE"
-        DIR=$( cd -P "$( dirname "$SOURCE"  )" && pwd )
-    done
-    DIR=$( cd -P "$( dirname "$SOURCE" )" && pwd )
-    echo $DIR
-}
 
-BASH_DIR=$(_current_path)
-
+# Check the permission.
 if [ $USER != "root" ];then
-	echo -e '\033[31m This command shoud run as administrator (user "root"), use "sudo '${BASH_NAME}'" please! \033[0m'
+	echo.danger ' This command shoud run as administrator (user "root"), use "sudo '${BASH_NAME}'" please!'
     exit
 fi
 
-DNSMASQ_ZONES_DIR=awk -F= '{print $2}' $BASH_DIR/conf/dnsmasq-d.conf
 
-mkdir -p $DNSMASQ_ZONES_DIR
-chown -R admin $DNSMASQ_ZONES_DIR
+INSTALLER_DIR=/opt/installer
+DNSMASQ_RUNNER_USER=admin
+USER_HOME="$(eval echo ~"$DNSMASQ_RUNNER_USER")"
+DNSMASQ_API_WWW=${USER_HOME}/work/www/dnsmasq-api
+DNSMASQ_API_REPO=https://github.com/rmfish/dnsmasq-api.git
+DNSMASQ_ZONES_DIR=${USER_HOME}/.dnsmasq/zones
+NGINX_DIR=/usr/local/nginx
 
-echo "Installing dnsmasq-rest-api to $APP_TARGET."
 
-[ -d $APP_TARGET  ] || git clone git://github.com/bpaquet/dnsmasq-rest-api.git $APP_TARGET
+echo.info " Install the dnsmasq."
+apt-get install -y dnsmasq
 
-echo "Configuring dnsmasq."
+echo.info " Install dnsmasq-api. [$DNSMASQ_API_WWW]"
+mkdir -p $DNSMASQ_API_WWW
+[ -d $DNSMASQ_API_WWW ] || git clone $DNSMASQ_API_REPO $DNSMASQ_API_WWW
 
-cp $BASH_DIR/conf/dnsmasq-d.conf /etc/dnsmasq.d/dnsmasq-api.conf
-service dnsmasq restart
+## cpoy the dnsmasq conf file
+DNSMASQ_CONFIG=/etc/dnsmasq.d/dnsmasq-api.conf
+echo.info " Config dnsmasq. [${DNSMASQ_CONFIG}]"
+if [ ! -f /etc/dnsmasq.d/dnsmasq-api.conf ]; then
+    cp $BASH_DIR/conf/dnsmasq-d.conf $DNSMASQ_CONFIG
+    mkdir -p $DNSMASQ_ZONES_DIR
+    chown -R ${DNSMASQ_RUNNER_USER} $DNSMASQ_ZONES_DIR
+    service dnsmasq restart
+fi
 
-echo "Allow dnsmasq-rest-api to send signal to dnsmasq"
+## config dnsmasq sudoer file
+DNSMASQ_SUDOER=/etc/sudoers.d/dnsmasq
+echo.info " Allow dnsmasq-api to reload dnsmasq config. [${DNSMASQ_SUDOER}]"
+cat >$DNSMASQ_SUDOER<<EOF
+${DNSMASQ_RUNNER_USER} ALL=(ALL) NOPASSWD:/usr/bin/service dnsmasq restart,/usr/bin/service dnsmasq force-reload
+EOF
+chmod 0440 $DNSMASQ_SUDOER
 
-cp $BASH_DIR/conf/dnsmasq-sudoers /etc/sudoers.d/dnsmasq
-chmod 0440 /etc/sudoers.d/dnsmasq
+## config nginx conf, add the  dnsmasq api to manage dnsmasq. 
+echo.info " Config nginx. [$NGINX_DIR/conf/apps/dnsmasq-nginx.conf]"
+if [ ! -f $NGINX_DIR/conf/apps/dnsmasq-nginx.conf ]; then
+    cp $BASH_DIR/conf/dnsmasq-nginx.conf $NGINX_DIR/conf/apps/
+    cp $NGINX_DIR/conf/apps/php.conf.default $NGINX_DIR/conf/apps/php.conf
+fi
 
-echo "Configuring nginx"
+echo.info " Dnsmasq installed."
 
-cp $BASH_DIR/conf/dnsmasq-nginx.conf $NGINX_APP_CONF/dnsmasq-api.conf
-service nginx restart
+## get current ip for other server.
+IP=`ifconfig eth1 | awk '/inet addr/{print substr($2,6)}'`
+if [ -n "$IP" ]; then 
+	echo.warning " Config other server's resolv file[/etc/resolv.conf]: nameserver ${IP}"
+fi

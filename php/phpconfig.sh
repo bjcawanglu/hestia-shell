@@ -9,24 +9,10 @@
 
 USER=`whoami`
 BASH_NAME=$(basename $BASH_SOURCE)
-
-_current_path() {
-    SOURCE=${BASH_SOURCE[0]}
-    DIR=$( dirname "$SOURCE" )
-    while [ -h "$SOURCE" ]
-    do
-        SOURCE=$(readlink "$SOURCE")
-        [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE"
-        DIR=$( cd -P "$( dirname "$SOURCE"  )" && pwd )
-    done
-    DIR=$( cd -P "$( dirname "$SOURCE" )" && pwd )
-    echo $DIR
-}
-
-BASH_DIR=$(_current_path)
+BASH_DIR=`bashdir`
 
 if [ $USER != "root" ];then
-        echo -e '\033[31m This command shoud run as administrator (user "root"), use "sudo '${BASH_NAME}'" please! \033[0m'
+        echo.danger 'This command shoud run as administrator (user "root"), use "sudo '${BASH_NAME}'" please!'
     exit
 fi
 
@@ -34,16 +20,19 @@ PHP_DIR=$1
 DEFAULT_PHP_DIR=/usr/local/php
 INSTALLER_DIR=/opt/installer
 PHP_CONFIG_DEFAULT=$BASH_DIR
+PHP_RUNNER_USER=admin
+PHP_RUNNER_GROUP=admin
+
 
 if [ ! -n "$PHP_DIR" ]; then
 	PHP_DIR=$DEFAULT_PHP_DIR
 	if [ -d $PHP_DIR ]; then
-		echo -e '\033[31m The PHP_DIR is not set. use the default php_dir['${PHP_DIR}']. \033[0m'
+		echo.warning ' The PHP_DIR is not set. use the default php_dir['${PHP_DIR}'].'
 	fi
 fi	
 
 if [ ! -d $PHP_DIR ]; then
-	echo -e '\033[31m The PHP_DIR is not set or the dir is not exist. use "'${BASH_NAME}' PHP_DIR" please! \033[0m'
+	echo.warning ' The PHP_DIR is not set or the dir is not exist. use "'${BASH_NAME}' PHP_DIR" please!'
 	exit
 fi	
 
@@ -63,7 +52,7 @@ fi
 mkdir -p ${PHP_DIR}/etc
 
 
-echo -e '\033[032m set '${PHP_DIR}'/etc/php.ini \033[0m'
+echo.info ' Set '${PHP_DIR}'/etc/php.ini'
 
 if [ ! -f ${PHP_DIR}/etc/php.ini ]; then
 	cp $PHP_CONFIG_DEFAULT/php.ini ${PHP_DIR}/etc/php.ini
@@ -95,7 +84,7 @@ if [ -f ${PHP_DIR}/etc/php.ini ]; then
 fi
 
 
-echo -e '\033[032m set '${PHP_DIR}'/etc/php-fpm.conf \033[0m'
+echo.info ' Set '${PHP_DIR}'/etc/php-fpm.conf'
 if [ ! -f ${PHP_DIR}/etc/php-fpm.conf ]; then
 	if [ -f $PHP_CONFIG_DEFAULT/php-fpm.conf ]; then
 		cp $PHP_CONFIG_DEFAULT/php-fpm.conf ${PHP_DIR}/etc/
@@ -110,11 +99,11 @@ log_level = notice
 listen = /var/run/php5-fpm.sock
 listen.backlog = -1
 listen.allowed_clients = 127.0.0.1
-listen.owner = admin
-listen.group = admin
+listen.owner = ${PHP_RUNNER_USER}
+listen.group = ${PHP_RUNNER_GROUP}
 listen.mode = 0666
-user = admin
-group = admin
+user = ${PHP_RUNNER_USER}
+group = ${PHP_RUNNER_GROUP}
 pm = dynamic
 pm.max_children = 10
 pm.start_servers = 2
@@ -129,10 +118,10 @@ EOF
 fi
 
 
-echo -e '\033[032m set admin nopasswd run php service \033[0m'
+echo.info "  Set admin nopasswd run php service."
 PHP_SUDOER=/etc/sudoers.d/adminphp
 cat >$PHP_SUDOER<<EOF
-admin ALL=(ALL) NOPASSWD:/usr/bin/service php-fpm restart
+${PHP_RUNNER_USER} ALL=(ALL) NOPASSWD:/usr/bin/service php-fpm restart
 EOF
-chmod 440 $PHP_SUDOER
+chmod 0440 $PHP_SUDOER
 

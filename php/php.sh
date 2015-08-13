@@ -9,35 +9,22 @@
 
 USER=`whoami`
 BASH_NAME=$(basename $BASH_SOURCE)
-
-_current_path() {
-    SOURCE=${BASH_SOURCE[0]}
-    DIR=$( dirname "$SOURCE" )
-    while [ -h "$SOURCE" ]
-    do
-        SOURCE=$(readlink "$SOURCE")
-        [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE"
-        DIR=$( cd -P "$( dirname "$SOURCE"  )" && pwd )
-    done
-    DIR=$( cd -P "$( dirname "$SOURCE" )" && pwd )
-    echo $DIR
-}
-
-BASH_DIR=$(_current_path)
+BASH_DIR=`bashdir`
 
 if [ $USER != "root" ];then
         echo -e '\033[31m This command shoud run as administrator (user "root"), use "sudo '${BASH_NAME}'" please! \033[0m'
+        echo.danger 'This command shoud run as administrator (user "root"), use "sudo '${BASH_NAME}'" please'
     exit
 fi
 
 
-echo -e "\033[32m Install the required libs. \033[0m"
-echo -e "\033[32m Update source. \033[0m"
+echo.info " Install the required libs."
+echo.info " Update source."
 #apt-get -qq update
 #for packages in gcc g++ make wget libpcre3 libpcre3-dev libpcrecpp0 openssl libcurl4-openssl-dev;
 for packages in gcc g++ make wget libmcrypt-dev;
 do 
-	echo -e "\033[32m Install $packages. \033[0m"
+	echo.info " Install $packages."
 	apt-get install -qq -y  $packages --force-yes;
 	#apt-get -fy -qq instaddll;
 	#apt-get -y -qq autoremove;
@@ -55,36 +42,33 @@ ICONV_TGZ=${ICONV_FILE}.tar.gz
 ICONV_URL=http://ftp.gnu.org/pub/gnu/libiconv/${ICONV_TGZ}
 ICONV_PREFIX_DIR=/usr/local
 
-echo -e "\033[32m Install the libiconv \033[0m"
+echo.info " Install the libiconv"
 if [ ! -L $ICONV_PREFIX_DIR/lib/$ICONV_SO ]; then
 	if [ ! -d ${INSTALLER_DIR}/${ICONV_FILE} ]; then
-		if [ ! -f ${INSTALLER_DIR}/${ICONV_FILE} ]; then
-			echo -e "\033[33m Download libiconv from ${ICONV_URL}: \033[0m"
-			wget ${ICONV_URL} -O $INSTALLER_DIR/${ICONV_TGZ}
-		fi
+		require ${INSTALLER_DIR}/${ICONV_TGZ} ${ICONV_URL}
 		tar zxf $INSTALLER_DIR/$ICONV_TGZ -C $INSTALLER_DIR
 	fi	
 	
 	cd $INSTALLER_DIR/$ICONV_FILE
-
-	echo -e "\033[33m Install ${INCONV_NAME}[${ICONV_VERSION}]: \033[0m"
+	
+	echo.info " Install ${INCONV_NAME}[${ICONV_VERSION}]:"
 	./configure --prefix=$ICONV_PREFIX_DIR
 
-	echo -e '\033[31m libiconv stdio.h bugfix. \033[0m'
+	echo.warning "  libiconv stdio.h bugfix."
 	# bugfix
 	sed -i 's/^_GL_WARN_ON_USE (gets, "gets is a security hole - use fgets instead")/\/\/&/' $INSTALLER_DIR/$ICONV_FILE/srclib/stdio.h	
 
-	echo -e "\033[32m  make libiconv \033[0m"
+	echo.warning "  make libiconv"
 	if [ $CPU_NUM -gt 1 ];then
 		make -j$CPU_NUM
 	else
 		make
 	fi
 
-	echo -e "\033[32m make installlibiconv \033[0m"
+	echo.warning "  make installlibiconv."
 	make install
 else
-	echo -e "\033[33m  The libiconv has installed on ${ICONV_PREFIX_DIR}/lib/${ICONV_SO} \033[0m"
+	echo.warning "  The libiconv has installed on ${ICONV_PREFIX_DIR}/lib/${ICONV_SO}"
 fi
 
 
@@ -94,26 +78,25 @@ PHP_VERSION=5.5.17
 PHP_FILE=${PHP_NAME}-${PHP_VERSION}
 PHP_TGZ=${PHP_FILE}.tar.gz
 PHP_URL=http://cn2.php.net/distributions/${PHP_TGZ}
+PHP_RUNNER_USER=admin
+PHP_RUNNER_GROUP=admin
 
-echo -e "\033[32m Install php-fpm \033[0m"
+echo.info " Install php-fpm"
 if [ ! -d $PHP_PREFIX_DIR ]; then
 	if [ ! -d ${INSTALLER_DIR}/${PHP_FILE} ]; then
-		if [ ! -f ${INSTALLER_DIR}/${PHP_TGZ} ]; then
-			echo -e "\033[33m Download ${PHP_TGZ} from ${PHP_URL}: \033[0m"
-			wget ${PHP_URL} -O $INSTALLER_DIR/${PHP_TGZ}
-		fi
+		require ${INSTALLER_DIR}/${PHP_TGZ} ${PHP_URL}
 		tar zxf $INSTALLER_DIR/$PHP_TGZ -C $INSTALLER_DIR
 	fi	
 	
 	cd $INSTALLER_DIR/$PHP_FILE
 
-	echo -e "\033[33m Install ${PHP_NAME}[${PHP_VERSION}]: \033[0m"
+	echo.info " Install ${PHP_NAME}[${PHP_VERSION}]:"
 	
 	./configure --prefix=${PHP_PREFIX_DIR} \
 	--with-config-file-path=${PHP_PREFIX_DIR}/etc \
 		--enable-fpm \
-		--with-fpm-user=admin \
-		--with-fpm-group=admin \
+		--with-fpm-user=${PHP_RUNNER_USER} \
+		--with-fpm-group=${PHP_RUNNER_GROUP} \
 		--with-mysql=mysqlnd \
 		--with-mysqli=mysqlnd \
 		--with-pdo-mysql=mysqlnd \
@@ -142,7 +125,7 @@ if [ ! -d $PHP_PREFIX_DIR ]; then
 
 		CPU_NUM=$(cat /proc/cpuinfo | grep processor | wc -l)
 
-		echo -e "\033[31m make php \033[0m"
+		echo.warning "  make php"
 
 		if [ $CPU_NUM -gt 1 ]; then
 			make ZEND_EXTRA_LIBS='-liconv' -j$CPU_NUM
@@ -155,8 +138,12 @@ if [ ! -d $PHP_PREFIX_DIR ]; then
 		cp $INSTALLER_DIR/$PHP_FILE/sapi/fpm/init.d.php-fpm /etc/init.d/php-fpm
 		chmod +x /etc/init.d/php-fpm
 else
-	echo -e "\033[33m  The php has installed on ${PHP_PREFIX_DIR} \033[0m"
+	echo.warning "  The php has installed on ${PHP_PREFIX_DIR}"
 fi
 
+if [ ! -f /etc/init.d/php-fpm ]; then
+	cp $INSTALLER_DIR/$PHP_FILE/sapi/fpm/init.d.php-fpm /etc/init.d/php-fpm
+	chmod +x /etc/init.d/php-fpm
+fi
 
 $BASH_DIR/phpconfig.sh $PHP_PREFIX_DIR
