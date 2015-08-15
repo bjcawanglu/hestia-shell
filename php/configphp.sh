@@ -9,7 +9,7 @@
 
 USER=`whoami`
 BASH_NAME=$(basename $BASH_SOURCE)
-BASH_DIR=`bashdir`
+BASH_DIR=`bashdir ${BASH_SOURCE[0]}`
 
 if [ $USER != "root" ];then
         echo.danger 'This command shoud run as administrator (user "root"), use "sudo '${BASH_NAME}'" please!'
@@ -19,7 +19,7 @@ fi
 PHP_DIR=$1
 DEFAULT_PHP_DIR=/usr/local/php
 INSTALLER_DIR=/opt/installer
-PHP_CONFIG_DEFAULT=$BASH_DIR
+PHP_CONFIG_DEFAULT=$BASH_DIR/conf
 PHP_RUNNER_USER=admin
 PHP_RUNNER_GROUP=admin
 
@@ -116,6 +116,8 @@ EOF
 	
 	fi
 fi
+
+mkdir -p /var/log/php
 
 
 echo.info "  Set admin nopasswd run php service."

@@ -9,7 +9,7 @@
 
 USER=`whoami`
 BASH_NAME=$(basename $BASH_SOURCE)
-BASH_DIR=`bashdir`
+BASH_DIR=`bashdir ${BASH_SOURCE[0]}`
 
 
 # Check the permission.
@@ -27,21 +27,27 @@ DNSMASQ_API_REPO=https://github.com/rmfish/dnsmasq-api.git
 DNSMASQ_ZONES_DIR=${USER_HOME}/.dnsmasq/zones
 NGINX_DIR=/usr/local/nginx
 
-
 echo.info " Install the dnsmasq."
 apt-get install -y dnsmasq
 
 echo.info " Install dnsmasq-api. [$DNSMASQ_API_WWW]"
-mkdir -p $DNSMASQ_API_WWW
-[ -d $DNSMASQ_API_WWW ] || git clone $DNSMASQ_API_REPO $DNSMASQ_API_WWW
+su $DNSMASQ_RUNNER_USER -c "mkdir -p $DNSMASQ_API_WWW"
+
+if [ ! -d $DNSMASQ_API_WWW/.git ]; then
+    su $DNSMASQ_RUNNER_USER -c "git clone $DNSMASQ_API_REPO $DNSMASQ_API_WWW"
+else
+    su $DNSMASQ_RUNNER_USER -c "git pull"
+fi
 
 ## cpoy the dnsmasq conf file
 DNSMASQ_CONFIG=/etc/dnsmasq.d/dnsmasq-api.conf
 echo.info " Config dnsmasq. [${DNSMASQ_CONFIG}]"
+if [ ! -d $DNSMASQ_ZONES_DIR ]; then
+    su $DNSMASQ_RUNNER_USER -c "mkdir -p $DNSMASQ_ZONES_DIR"
+fi
+
 if [ ! -f /etc/dnsmasq.d/dnsmasq-api.conf ]; then
     cp $BASH_DIR/conf/dnsmasq-d.conf $DNSMASQ_CONFIG
-    mkdir -p $DNSMASQ_ZONES_DIR
-    chown -R ${DNSMASQ_RUNNER_USER} $DNSMASQ_ZONES_DIR
     service dnsmasq restart
 fi
 
