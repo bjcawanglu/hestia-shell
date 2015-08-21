@@ -11,7 +11,7 @@ command_exists() {
     command -v "$@" > /dev/null 2>&1
 }
 
-if ! command_exists echo.info1; then
+if ! command_exists echo.info; then
 	echo "The basic cmd is not installed. run 'sudo sh base/base.sh' please!"
 	exit
 fi
@@ -22,8 +22,9 @@ BASH_NAME=$(basename $BASH_SOURCE)
 BASH_DIR=`bashdir ${BASH_SOURCE[0]}`
 
 echo.private "This is a template shell, created by rmfish."
-echo.info "CurrentShell is: '$BASH_DIR/$BASH_NAME'"
+echo.info "Shell path is: '$BASH_DIR/$BASH_NAME'"
 
 if [ $USER != "root" ];then
-    echo.danger "This command shoud run as administrator (user "root"), use "sudo '${BASH_NAME}'" please! \033[0m"
+    echo.danger 'This command shoud run as administrator (user "root"), use "sudo '${BASH_NAME}'" please!'
     exit
+fi
