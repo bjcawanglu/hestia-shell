@@ -1,1 +1,1 @@
-# scaffold-shell
+# Hestia-shell
